@@ -31,9 +31,6 @@ const material = new THREE.MeshBasicMaterial({
 });
 const cube = new THREE.Mesh(PlaneGeometry, material);
 
-
-
-
 scene.add(cube);
 
 const renderer = new THREE.WebGL1Renderer();
@@ -47,6 +44,7 @@ controls.enableDamping = true;
 function animation() {
   requestAnimationFrame(animation);
   controls.update();
+
   // cube.rotation.x += 0.01;
   // cube.rotation.y += 0.01;
   renderer.render(scene, carema);

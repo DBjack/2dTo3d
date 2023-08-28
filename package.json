@@ -10,10 +10,21 @@
     "prepare": "husky install"
   },
   "devDependencies": {
-    "vite": "^4.4.5",
-    "husky": "^8.0.0"
+    "eslint": "^8.48.0",
+    "eslint-plugin-vue": "^9.17.0",
+    "husky": "^8.0.3",
+    "vite": "^4.4.5"
   },
   "dependencies": {
+    "lint-staged": "^14.0.1",
     "three": "^0.155.0"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged"
+    }
+  },
+  "lint-staged": {
+    "*.js": "eslint --fix"
   }
 }
