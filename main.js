@@ -10,6 +10,8 @@ const carema = new THREE.PerspectiveCamera(
   1000
 );
 
+console.log(111222333);
+
 carema.position.set(0, 0, 10);
 scene.add(carema);
 

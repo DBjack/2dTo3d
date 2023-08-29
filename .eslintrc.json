@@ -13,7 +13,9 @@
     },
     "plugins": [
         "vue"
+        
     ],
     "rules": {
+    "no-console": "warn" // 不允许使用 console.log 等                 
     }
 }
