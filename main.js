@@ -23,15 +23,10 @@ scene.add(axesHelper);
 //将相机添加到场景中
 scene.add(camera);
 
-// 创建一个材质 颜色为红色
-const material = new THREE.MeshBasicMaterial({
-  color: 0xff0000,
-});
-
 // 加载纹理
 const textureLoader = new THREE.TextureLoader();
-const texture = textureLoader.load("./models/picTo3d/sunset.jpg");
-const depthTexture = textureLoader.load("./models/picTo3d/sunset-depth.jpg");
+const texture = textureLoader.load("./model/picTo3d/cat.jpg");
+const depthTexture = textureLoader.load("./model/picTo3d/cat-depth.jpg");
 
 // 创建一个鼠标二维向量
 const mouse = new THREE.Vector2();
@@ -40,14 +35,28 @@ const mouse = new THREE.Vector2();
 const shaderMaterial = new THREE.ShaderMaterial({
   // 顶点着色器
   vertexShader: `
+    varying vec2 vUv;
     void main() {
+      vUv = uv;
       gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
     }
   `,
   // 片元着色器
   fragmentShader: `  
-    void main() {
-      gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+      uniform sampler2D uTexture;
+      uniform sampler2D uDepthTexture;
+      uniform vec2 uMouse;
+      varying vec2 vUv;
+      void main() {
+        vec4 color = texture2D(uTexture, vUv);
+        vec4 depth = texture2D(uDepthTexture, vUv);
+        float depthValue = depth.r;
+        float distance = distance(uMouse, vUv);
+        float x = vUv.x + (uMouse.x*0.01)*depthValue;
+        float y = vUv.y + (uMouse.y*0.01)*depthValue;
+        vec4 newColor = texture2D(uTexture, vec2(x, y));
+        float alpha = smoothstep(0.5, 0.0, distance);
+      gl_FragColor = newColor;
     }
   `,
   uniforms: {
@@ -67,10 +76,10 @@ const shaderMaterial = new THREE.ShaderMaterial({
 });
 
 // 创建一个立方体 几何体
-const geometry = new THREE.BoxGeometry(1, 1, 1);
+const geometry = new THREE.PlaneGeometry(19, 12);
 
 // 创建一个网格
-const cube = new THREE.Mesh(geometry, material);
+const cube = new THREE.Mesh(geometry, shaderMaterial);
 
 // 将网格添加到场景中
 scene.add(cube);
@@ -86,14 +95,47 @@ document.body.appendChild(renderer.domElement);
 
 // 渲染
 function animate() {
+  // 给材质传入鼠标二维向量
+  shaderMaterial.uniforms.uMouse.value = mouse;
+
   // 递归调用渲染函数
   requestAnimationFrame(animate);
-  cube.rotation.x += 0.01;
-  cube.rotation.y += 0.01;
+  // cube.rotation.x += 0.01;
+  // cube.rotation.y += 0.01;
 
   // 渲染场景
   renderer.render(scene, camera);
 }
+
+// 监听鼠标移动事件
+window.addEventListener("mousemove", (e) => {
+  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+});
+
+// 防抖函数
+function debounce(fn, delay) {
+  let timer = null;
+  return function () {
+    if (timer) {
+      clearTimeout(timer);
+    }
+    timer = setTimeout(fn, delay);
+  };
+}
+
+// 使用防抖函数监听窗口大小变化事件
+window.addEventListener(
+  "resize",
+  debounce(() => {
+    // 重新设置渲染器的大小
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    // 重新设置相机的宽高比
+    camera.aspect = window.innerWidth / window.innerHeight;
+    // 更新相机的投影矩阵
+    camera.updateProjectionMatrix();
+  }, 200)
+);
 
 // 调用渲染函数
 animate();
