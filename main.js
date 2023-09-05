@@ -46,14 +46,15 @@ const shaderMaterial = new THREE.ShaderMaterial({
       uniform sampler2D uTexture;
       uniform sampler2D uDepthTexture;
       uniform vec2 uMouse;
+      uniform float uTime;
       varying vec2 vUv;
       void main() {
         vec4 color = texture2D(uTexture, vUv);
         vec4 depth = texture2D(uDepthTexture, vUv);
         float depthValue = depth.r;
         float distance = distance(uMouse, vUv);
-        float x = vUv.x + (uMouse.x*0.01)*depthValue;
-        float y = vUv.y + (uMouse.y*0.01)*depthValue;
+        float x = vUv.x + ((uMouse.x + sin(uTime))*0.01)*depthValue;
+        float y = vUv.y + ((uMouse.y + cos(uTime))*0.01)*depthValue;
         vec4 newColor = texture2D(uTexture, vec2(x, y));
         float alpha = smoothstep(0.5, 0.0, distance);
       gl_FragColor = newColor;
@@ -71,6 +72,10 @@ const shaderMaterial = new THREE.ShaderMaterial({
     uMouse: {
       // 鼠标二维向量
       value: mouse,
+    },
+    uTime: {
+      // 时间
+      value: 0,
     },
   },
 });
@@ -97,6 +102,8 @@ document.body.appendChild(renderer.domElement);
 function animate() {
   // 给材质传入鼠标二维向量
   shaderMaterial.uniforms.uMouse.value = mouse;
+  // 给材质传入时间
+  shaderMaterial.uniforms.uTime.value = performance.now() / 1000;
 
   // 递归调用渲染函数
   requestAnimationFrame(animate);
