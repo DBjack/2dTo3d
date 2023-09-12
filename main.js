@@ -1,9 +1,11 @@
 import * as THREE from "three";
-
+import * as d3 from "d3";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 // 创建一个场景
 const scene = new THREE.Scene();
 
 // 创建一个相机
+
 const camera = new THREE.PerspectiveCamera(
   75,
   window.innerWidth / window.innerHeight,
@@ -12,137 +14,98 @@ const camera = new THREE.PerspectiveCamera(
 );
 
 // 设置相机的位置
-camera.position.z = 5;
+camera.position.z = 100;
 
 // 创建一个坐标轴
 const axesHelper = new THREE.AxesHelper(5);
 
 // 将坐标轴添加到场景中
+
 scene.add(axesHelper);
 
 //将相机添加到场景中
+
 scene.add(camera);
 
-// 加载纹理
-const textureLoader = new THREE.TextureLoader();
-const texture = textureLoader.load("./model/picTo3d/cat.jpg");
-const depthTexture = textureLoader.load("./model/picTo3d/cat-depth.jpg");
+const project = d3.geoMercator().center([107, 31]).translate([0, 0]);
 
-// 创建一个鼠标二维向量
-const mouse = new THREE.Vector2();
-
-// 创建一个着色器材质
-const shaderMaterial = new THREE.ShaderMaterial({
-  // 顶点着色器
-  vertexShader: `
-    varying vec2 vUv;
-    void main() {
-      vUv = uv;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-    }
-  `,
-  // 片元着色器
-  fragmentShader: `  
-      uniform sampler2D uTexture;
-      uniform sampler2D uDepthTexture;
-      uniform vec2 uMouse;
-      uniform float uTime;
-      varying vec2 vUv;
-      void main() {
-        vec4 color = texture2D(uTexture, vUv);
-        vec4 depth = texture2D(uDepthTexture, vUv);
-        float depthValue = depth.r;
-        float distance = distance(uMouse, vUv);
-        float x = vUv.x + ((uMouse.x + sin(uTime))*0.01)*depthValue;
-        float y = vUv.y + ((uMouse.y + cos(uTime))*0.01)*depthValue;
-        vec4 newColor = texture2D(uTexture, vec2(x, y));
-        float alpha = smoothstep(0.5, 0.0, distance);
-      gl_FragColor = newColor;
-    }
-  `,
-  uniforms: {
-    uTexture: {
-      // 纹理
-      value: texture,
-    },
-    uDepthTexture: {
-      // 深度纹理
-      value: depthTexture,
-    },
-    uMouse: {
-      // 鼠标二维向量
-      value: mouse,
-    },
-    uTime: {
-      // 时间
-      value: 0,
-    },
-  },
-});
-
-// 创建一个立方体 几何体
-const geometry = new THREE.PlaneGeometry(19, 12);
-
-// 创建一个网格
-const cube = new THREE.Mesh(geometry, shaderMaterial);
-
-// 将网格添加到场景中
-scene.add(cube);
-
-//创建一个渲染器
-const renderer = new THREE.WebGLRenderer();
-
-// 设置渲染器的大小
-renderer.setSize(window.innerWidth, window.innerHeight);
-
-// 将渲染器添加到页面中
-document.body.appendChild(renderer.domElement);
-
-// 渲染
-function animate() {
-  // 给材质传入鼠标二维向量
-  shaderMaterial.uniforms.uMouse.value = mouse;
-  // 给材质传入时间
-  shaderMaterial.uniforms.uTime.value = performance.now() / 1000;
-
-  // 递归调用渲染函数
-  requestAnimationFrame(animate);
-  // cube.rotation.x += 0.01;
-  // cube.rotation.y += 0.01;
-
-  // 渲染场景
-  renderer.render(scene, camera);
-}
-
-// 监听鼠标移动事件
-window.addEventListener("mousemove", (e) => {
-  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
-});
-
-// 防抖函数
-function debounce(fn, delay) {
-  let timer = null;
-  return function () {
-    if (timer) {
-      clearTimeout(timer);
-    }
-    timer = setTimeout(fn, delay);
-  };
-}
-
-// 使用防抖函数监听窗口大小变化事件
-window.addEventListener(
-  "resize",
-  debounce(() => {
-    // 重新设置渲染器的大小
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    // 重新设置相机的宽高比
-    camera.aspect = window.innerWidth / window.innerHeight;
-    // 更新相机的投影矩阵
-    camera.updateProjectionMatrix();
-  }, 200)
+const loader = new THREE.FileLoader();
+loader.load(
+  "https://geo.datav.aliyun.com/areas_v3/bound/100000_full.json",
+  (data) => {
+    console.log(JSON.parse(data));
+    const features = JSON.parse(data).features;
+    features.forEach((feature) => {
+      const geometry = feature.geometry;
+      if (geometry.type === "MultiPolygon") {
+        const coordinates = geometry.coordinates;
+        coordinates.forEach((coordinate) => {
+          coordinate.forEach((item) => {
+            const plogyon = drawPlogyon(item, project);
+            const line = drawLine(item, project);
+            scene.add(plogyon);
+            scene.add(line);
+          });
+        });
+      }
+    });
+    console.log(scene);
+  }
 );
 
-// 调用渲染函数
+const renderer = new THREE.WebGLRenderer({
+  antialias: true,
+});
+
+renderer.setSize(window.innerWidth, window.innerHeight);
+
+document.body.appendChild(renderer.domElement);
+
+const orbitControls = new OrbitControls(camera, renderer.domElement);
+function animate() {
+  orbitControls.update();
+  renderer.render(scene, camera);
+  requestAnimationFrame(animate);
+}
 animate();
+
+function drawPlogyon(row, pro) {
+  const shape = new THREE.Shape();
+
+  row.forEach((item, index) => {
+    const [x, y] = pro(item);
+    if (index === 0) {
+      shape.moveTo(x, -y);
+    } else {
+      shape.lineTo(x, -y);
+    }
+  });
+
+  const geometry = new THREE.ExtrudeGeometry(shape, {
+    depth: 3,
+    bevelEnabled: true,
+  });
+
+  const metrial = new THREE.MeshBasicMaterial({
+    color: 0x00ff00,
+    transparent: true,
+    opacity: 0.5,
+  });
+
+  return new THREE.Mesh(geometry, metrial);
+}
+
+function drawLine(row, pro) {
+  const bufferGeometry = new THREE.BufferGeometry();
+  const pointersArray = [];
+  row.forEach((item) => {
+    const [x, y] = pro(item);
+    pointersArray.push(new THREE.Vector3(x, -y, 4));
+  });
+  bufferGeometry.setFromPoints(pointersArray);
+  const material = new THREE.LineBasicMaterial({
+    color: 0x0000ff,
+  });
+
+  return new THREE.Line(bufferGeometry, material);
+}
